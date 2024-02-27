@@ -1,0 +1,636 @@
+---
+title: "Summary Statistics & Hypothesis Testing - Education Data"
+author: "Dan N"
+date: "February 19, 2024"
+output: 
+  html_document:
+    toc: TRUE
+    toc_depth: 3
+    theme: united
+    toc_float: true
+    collapsed: false
+---
+
+# Summary Statistics
+
+Data downloaded from https://edopportunity.org/. Specifically Version SEDA 2023; documentation of data derivation and its usage can be found at said website.
+
+## Data Structure
+
+Hi Claudia! Hope your semester is going well. This first section is to familiarize yourself with the data we are working with.
+Take a look at the first 10 rows of the data set "scores" following some cleaning and merging. We subset data to the year 2018 since that
+is the most recent year where I was able to validly link ELL data.
+
+```{r setup, include=FALSE, echo=FALSE}
+### install/load libraries
+
+#install.packages("kableExtra")
+library(kableExtra)
+library(knitr)
+library(dplyr)
+#install.packages("gridExtra")
+library(gridExtra)
+library(ggplot2)
+#install.packages("png")
+library(png)
+library(grid)
+library(Rmisc)
+
+```
+
+```{r load_data }
+### load data
+
+scores <- read.csv(file = "~/R Scripts/scores_all.csv", stringsAsFactors = F)
+scores$year <- as.character(scores$year)
+scores <- scores[, -c(1,4)]                   # drop redundant vars
+scores2018 <- scores[scores$year == "2018", ] # select only 2018
+
+### the case for dropping observations with NAs needs to be made prior to 
+### any analysis. missing data comes in many flavors, such as bad data entry,
+### or planned omitted entries (i.e. a grade level that doesnt take a mandated test). 
+### here, i drop observations because we are not trying to find insights, but rather 
+### wanting to demonstrate some statistical programming technicalities. 
+scores2018 <- scores2018[!is.na(scores2018$math_score), ] # drop NAs
+scores2018 <- scores2018[!is.na(scores2018$read_score), ] # drop NAs
+scores2018 <- scores2018[!is.na(scores2018$perell), ] # drop NAs
+
+knitr::kable(head(scores2018, n = 10), format = "html") %>% 
+  kable_styling(bootstrap_options = "striped", full_width = T)
+
+```
+
+## Summary Statistics for 2018
+
+Lets get some summaries for our salient variables. There are numerous ways to get summary statistics. But you are more than welcome to create your own function for the specific metrics you want. For example:
+```{r summfunc1}
+summstat4claudia <- function(x) {
+  nums <- NA
+  char <- NA
+  if (is.numeric(x) == T | is.integer(x) == T) {
+  mn <- mean(x, na.rm = T)
+  sd <- sd(x, na.rm = T)
+  mi <- min(x, na.rm = T)
+  q1 <- quantile(x, prob = 0.25, na.rm = T)
+  md <- median(x, na.rm = T)
+  q3 <- quantile(x, prob = 0.75, na.rm = T)
+  mx <- max(x, na.rm = T)
+  nums <- c("mean"=mn, "sd"=sd, "min"=mi, "q1"=q1, "med"=md, "q3"=q3, "max"=mx)
+  }
+  else if (is.character(x) == T | is.factor(x) == T) {
+   cnt <- table(x)
+   char <- c("count"=cnt)
+  }
+  return(list(nums,char))
+}
+
+summstat4claudia(scores2018$stateabb)
+summstat4claudia(scores2018$math_score)
+```
+With this function, we get the a count of how many school districts are represented in each state in 2018. We can also get mean, sd, 
+median, etc., for math scores in 2018. But, I think the presentation is nicer using the *summary* function so we will go with that method
+instead:
+```{r summ1}
+knitr::kable(summary(scores2018[, c(2, 5, 7, 11:13, 17, 18, 10)]), format = "html", 
+             caption = "Summary Statistics for Education Scores",
+             col.names = c("Year Count", "Math Score", "Read Score", 
+                           "Percent Free/Reduced Lunch", "Percent Black",
+                           "Percent Hispanic", "Percent White", "Percent ELL", "Total Enroll")) %>% 
+  kable_styling(bootstrap_options = "striped")
+```
+
+Now, lets plot the distributions for our variables.
+I added x-intercepts to show where the mean and median are for both math and read scores. Distributions for other variables of interest
+are also plotted, sans x-intercepts. Note that this is just one of many visuals to see the distribution of our data. There are hypotheses
+tests for assessing normality (Shapiro-Wilk, Kolmogorov-Smirnov, etc.) where, in general, the null would be "your data distribution is 
+normal". But because we have a large sample in 2018, its very likely that any normality test will reject the null.
+
+```{r summ2, fig.height=10, fig.width=14, fig.align='center'}
+
+### here are a couple of normality tests you can try:
+# shapiro.test(df$var)
+# ks.test(df$var, "pnorm", mean, sd)
+
+
+mth_plt <- ggplot(scores2018, aes(math_score)) + geom_histogram(bins = 10, na.rm = T) + 
+  geom_vline(aes(xintercept = mean(math_score), colour = "mean")) + geom_vline(aes(xintercept = median(math_score), colour = "median"))
+
+rla_plt <- ggplot(scores2018, aes(read_score)) + geom_histogram(bins = 10, na.rm = T) +
+  geom_vline(aes(xintercept = mean(read_score), colour = "mean")) + geom_vline(aes(xintercept = median(read_score), colour = "median"))
+
+frl_plt <- ggplot(scores2018, aes(perfrl)) + geom_histogram(bins = 10, na.rm = T)
+blk_plt <- ggplot(scores2018, aes(perblk)) + geom_histogram(bins = 10, na.rm = T)
+wht_plt <- ggplot(scores2018, aes(perwht)) + geom_histogram(bins = 10, na.rm = T)
+hsp_plt <- ggplot(scores2018, aes(perhsp)) + geom_histogram(bins = 10, na.rm = T)
+ell_plt <- ggplot(scores2018, aes(perell)) + geom_histogram(bins = 10, na.rm = T)
+
+#knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+grid.arrange(mth_plt, rla_plt, frl_plt, blk_plt, wht_plt, hsp_plt, ell_plt, ncol = 2)
+
+```
+
+## Create New Variables and Graphs
+
+We need to make some categorical variables for plotting and later hypothesis testing. 
+Making free or reduced lunch (perfrl) a dichotomous variable where school districts having greater than or equal to 50% of students on
+free or reduced lunch is ">.50", else "<.50". Then, we can display math and reading scores with box plots grouped by this new variable.
+
+```{r summ3}
+
+scores2018 <- scores2018 %>% 
+  mutate(frlunch = ifelse(perfrl >= .50, ">.50", "<.50"))
+
+```
+
+First, lets see the distribution of our new variable.
+
+```{r summ3_1, fig.height=4, fig.width=8, fig.align='center'}
+
+ggplot(scores2018, aes(frlunch)) + geom_bar(aes(y = after_stat(prop), group = 1))
+
+```
+
+Now we can plot against math and read scores. In both scores we see that school districts with higher economically disadvantaged 
+populations tend to have lower scores.
+
+```{r sum4, fig.height=8, fig.width=12, fig.align='center'}
+
+mth_plt2 <- ggplot(scores2018, aes(frlunch, math_score)) + geom_boxplot()
+rla_plt2 <- ggplot(scores2018, aes(frlunch, read_score)) + geom_boxplot()
+
+grid.arrange(mth_plt2, rla_plt2, ncol = 2)
+
+```
+
+Now looking at this same plot but with a new variable for large, medium and small school district sizes.
+
+```{r summ5}
+
+scores2018 <- scores2018 %>% 
+  mutate(dstsize = case_when(
+    totenrl >= 5000 ~ "Large",
+    totenrl < 5000 & totenrl >= 2000 ~ "Medium",
+    totenrl < 2000 ~ "Small"
+  ))
+
+```
+
+
+```{r summ5_1, fig.height=4, fig.width=8, fig.align='center'}
+
+ggplot(scores2018, aes(dstsize)) + geom_bar(aes(y = after_stat(prop), group = 1))
+
+```
+
+```{r summ6, fig.height=8, fig.width=12, fig.align='center'}
+
+mth_plt3 <- ggplot(scores2018, aes(frlunch, math_score)) + geom_boxplot(aes(colour = dstsize))
+rla_plt3 <- ggplot(scores2018, aes(frlunch, read_score)) + geom_boxplot(aes(colour = dstsize))
+
+grid.arrange(mth_plt3, rla_plt3, ncol = 2)
+
+```
+
+Let's now create a dichotomous variable for percent ELL.
+
+```{r summ7}
+
+scores2018 <- scores2018 %>% 
+  mutate(ell = case_when(
+    perell >= 0.10 ~ ">.10",
+    perell < 0.10 ~ "<.10"
+  ))
+
+```
+
+Graph our new ELL variable.
+
+```{r summ7_1, fig.height=4, fig.width=8, fig.align='center'}
+
+ggplot(scores2018, aes(ell)) + geom_bar(aes(y = after_stat(prop), group = 1))
+
+```
+
+Let's plot again with our new ELL variable.
+
+```{r summ8, fig.height=8, fig.width=12, fig.align='center'}
+
+mth_plt4 <- ggplot(scores2018, aes(frlunch, math_score)) + geom_boxplot(aes(colour = ell))
+rla_plt4 <- ggplot(scores2018, aes(frlunch, read_score)) + geom_boxplot(aes(colour = ell))
+
+grid.arrange(mth_plt4, rla_plt4, ncol = 2)
+
+```
+
+```{r summ9, include=FALSE, echo=FALSE}
+
+```
+# Hypothesis Testing
+
+Now lets see how some hypothesis tests are done and what is in the output. Please note that when preforming any hypothesis tests, you should really
+have a good understanding of your research question and if the data you have can be used to properly answer that question. The following tests are
+to demonstrate the R language, what test to use and when, as well as interpretations. These are all parametric tests. Non-parametric tests can be
+used in favor of these when assumptions are not met.
+
+## One Sample, Continuous Outcome
+Objective is to compare the mean in a single population to a known (or hypothesized) mean.
+
+H0: $\mu$ = $\mu0$, where $\mu0$ is the known (or hypothesized) mean
+
+H1: $\mu$ < $\mu0$ / $\mu$ > $\mu0$ / $\mu$ ne $\mu0$, where lower-tail / upper-tail/ two-tail
+
+```{r hyp1, fig.height=8, fig.width=12, fig.align='center'}
+
+# can change alternative = "lower" for lower-tail
+# can change alternative = "upper" for upper-tail
+# can change mu = xx to any known or hypothesized value
+t.test(scores2018$math_score, mu = 0.30, alternative = "two.sided")
+
+```
+This is a two-tailed test, and we choose alpha at 0.05. Therefore, we reject the H0 if our test statistic (t above) is $\leq$ -1.96 OR
+if t is $\geq$ 1.96. Since t = -3.8188, and -3.8188 < -1.96, we have statistically significant evidence at alpha=0.05 to show 
+that the mean math score (0.2357) is different from the hypothesized mean (0.30). 
+
+
+## Two Independent samples, Continuous Outcome
+
+Objective is to compare two means by testing whether the observed difference (decrease, increase, difference) is statistically
+significant or not. The equality of variance assumption is important here since we pool the variances. A rule of thumb is that if the ratio of 
+the group variances is between 0.5 and 2, the assumption of equality is met. However, you can use the Levene's test to test this assumption
+where the null of the Levene's test is the variance among groups is equal (so you want to fail to reject this null!!)
+leveneTest(outcome ~ group)
+
+
+H0: $\mu1$ = $\mu2$
+
+H1: $\mu1$ < $\mu2$ / $\mu1$ > $\mu2$ / $\mu1$ ne $\mu2$, where lower-tail / upper-tail/ two-tail
+
+```{r hyp2}
+# can change alternative = "lower" for lower-tail
+# can change alternative = "upper" for upper-tail
+t.test(scores2018$math_score ~ scores2018$ell)
+
+```
+This is a two-tailed test with alpha=0.05. Therefore, we reject the H0 if our test statistic (t above) is $\leq$ -1.96 OR if t 
+is $\geq$ 1.96. Since 25.173 > 1.96, we have statistically significant evidence at alpha=0.05 to show that there is a difference in 
+mean math scores between school districts with <10% ELLs and school districts with >10% ELLs, with districts having <10% ELLs having a higher 
+mean math score. Note the 95% CI does not include the null value 0. 
+
+
+## Two Dependent (Matched) Samples, Continuous Outcome
+
+With dependent samples, say school district test scores measured twice or students assessed before and after instruction, we want to test for 
+difference scores and again the null reflects no difference. If you did this by hand, the following would be more obvious: the order of subtraction 
+matters. For example, math scores for 2018 minus math scores for 2017, or vice versa! In simpler terms, before - after, or after - 
+before. The way the differences are calculated will not affect the analysis, but it will affect how you set up your hypothesis when it comes
+to one-tailed tests. 
+
+H0: $\overline{x}d$ = 0 
+
+H1: $\overline{x}d$ ne 0 / $\overline{x}d$ > 0 / $\overline{x}d$ < 0
+
+I created a fake data set of school attendance for some made up at-risk youth.
+
+```{r hyp3}
+### made up attendance data for 15 at-risk students
+### fist assign some IDs
+id <- c(1,2,3,4,5,6,7,8,9,10,11,12,13,14,15)
+
+### create values for each at-risk student's days of attending school
+before <- c(205,156,190,180,201,227,197,173,204,217,142,212,207,184,193)
+
+### imagine there is an intervention over the summer and you document school attendance the following year 
+### for the same the at-risk students 
+after <- c(215,190,230,220,214,240,210,193,210,230,180,210,210,190,200)
+
+### compile your data
+attdn_dat <- data.frame(id, before, after)
+
+### say you are interested if the intervention increased attendance. 
+### this means you want to see positive differences so you would subtract before attendance 
+### from after attendance, and the H1 would be an upper-tailed test.
+t.test(after, before, data = attdn_dat, paired=TRUE, alternative = "greater")
+
+```
+After - Before results in positive differences IF the intervention was successful. Meaning, at-risk students increased their attendance.
+This is a one-tailed test with alpha = 0.05. The sample size is small so we need the t-distribution to determine the critical value with 
+degrees of freedom = n - 1; which would be 1.76. Since our t value in the output above is 4.63, and 4.63 > 1.76, we have statistically
+significant evidence at alpha = 0.05 to show that there is an increase in school attendance following intervention.
+
+
+What happens if you reverse the order of subtraction and you do not adjust the H1 to align with your research question ???
+
+```{r hyp4}
+
+t.test(before, after, data = attdn_dat, paired=TRUE, alternative = "greater")
+
+```
+You get negative differences and your t statistic ends up to the left of 0, meanwhile your H1 is looking to the right of 0. You would be very
+disappointed with your intervention :(
+
+In order for this to work, you would have to ask if the intervention reduced the days of absences. This would require a lower-tailed test.
+
+```{r hyp5}
+
+t.test(before, after, data = attdn_dat, paired=TRUE, alternative = "less")
+
+```
+
+## 3 or More Independent Samples, Continuous Outcome
+
+Analysis of Variance (ANOVA) is used when we have more than two independent groups and we wish to compare the means. A few things 
+to keep in mind; the H0 is always mean of group1 = group2 = group3 .. for as many groups as you have and the H1 is always 'the means
+are not all equal'. ANOVA uses F statistic (as opposed to the z or t from before) and only has one tail to the right. The F statistic
+is indexed by two degrees of freedom (Df1 = k - 1 and Df2 = N - k, where N is total observations and k is total groups). F is calculated
+by taking the ratio of the between-group variability (numerator) to the error (denominator). So, when both are close in value, the 
+F statistic will be small and you will likely fail to reject the H0. Keep in mind that there are assumptions that still need to 
+be met in order for this to be an appropriate test, such as equal group variance!!
+
+
+H0: $\mu1$ = $\mu2$ = $\mu3$
+
+H1: Means are not all equal
+
+Lets subset our data to the state of Illinois.
+```{r hyp6}
+### because Df1 & Df2 index the critical value needed to test our hypothesis, 
+### we should get a subset of data with <100 observations to determine the critical 
+### value with ease when alpha=0.05.
+il2018 <- scores2018[scores2018$stateabb == "IL", ]
+il2018 <- il2018[il2018$frlunch == ">.50", ]
+il2018 <- il2018[il2018$ell == ">.10", ]
+
+### lets take a look at the mean math score for each district size
+tapply(il2018$math_score, il2018$dstsize, mean)
+
+```
+
+```{r hyp6_1}
+### first, other ways of getting the anova output:
+
+# lm<-lm(outcome_var ~ group_var)  
+
+### the output of summary(lm) will show coefficients for k-1 of the groups.
+### where the coefficients will measure the difference in means of a particular 
+### group to reference group and the intercept will be the mean of the reference group.
+### Note Df, F value, p value will be the same as aov()
+# summary(lm) 
+
+### same output as aov() function below
+# anova(lm) 
+
+
+### now we run the anova test 
+summary(aov(il2018$math_score ~ il2018$dstsize))
+```
+From the output above, first note the Df column. Df1 = (k - 1) = (3 - 1) = 2 and Df2 = (N - k) = (72 - 3) = 69. If we look at the
+F distribution table below, we will find that our critical value is 3.130. Remember that this test only has one tail to the right, 
+so we reject the H0 if our test statistic is $\geq$ the critical value at a chosen alpha (we choose 0.05). Since the 
+test statistic (F-value) is 0.082, and 0.082 < 3.130, we fail to reject the H0 (p value = 0.921! Also note that the F value 
+is < 1. This is a ratio between the Mean Sq of between-group variability (numerator) to the error (denominator), so when the error 
+is greater, F is < 1. 
+
+```{r hyp6_png, include=FALSE}
+img <- readPNG("~/R Scripts/fdist.png")
+```
+
+```{r hyp6_png2, echo=FALSE, fig.height=4, fig.width=6, fig.align='center'}
+grid.raster(img)
+```
+
+Lets plot and see if we can visualize why they are not different.
+```{r hyp6_png3, echo=FALSE, fig.height=4, fig.width=8, fig.align='center'}
+### within group 
+# il_plt <- summarySEwithin(il2018, measurevar="math_score", withinvars="dstsize",
+#                        idvar="sedaadmin", na.rm=FALSE, conf.interval=.95)
+### between group
+il_plt <- summarySE(il2018, measurevar="math_score", groupvars = "dstsize",
+                         na.rm=FALSE, conf.interval=.95)
+
+ggplot(il_plt, aes(x=dstsize, y=math_score, group = 1)) +
+    geom_line() +
+    geom_errorbar(width=.2, aes(ymin=math_score-ci, ymax=math_score+ci), colour="black") +
+    geom_point(shape=23, size=3, fill="orange") 
+
+```
+
+### Post Hoc Test for ANOVA
+
+If you get a statistically significant result from your ANOVA test, you know there are differences between group means, BUT you
+don't know where they are!! In our example, the 3 groups were district size 'Large', 'Medium', and 'Small' we did not have a 
+significant result. If we had, we would want to know if all 3 different from one another, or just between large and small, or between
+large and medium, or between small and medium. There are a few tests available for this (Tukey, Holm, Bonferroni, Dunnett). We will
+use Tukey since the output is more digestible. Previously, we looked at the state of Illinois, now lets look at Indiana.
+
+```{r hy7_1}
+in2018 <- scores2018[scores2018$stateabb == "IN", ]
+in2018 <- in2018[in2018$frlunch == ">.50", ]
+in2018 <- in2018[in2018$ell == ">.10", ]
+in.mod <- aov(in2018$math_score ~ in2018$dstsize)
+summary(in.mod)
+```
+Okay!! Looks like we reject the H0 in favor of the H1. So we know the group means are different, but we do not know where. So lets
+do our multiple comparisons test to find these differences!
+```{r hyp7_2}
+### other methods of multiple comparison
+# pairwise.t.test(outcome, group, p.adjust.method = "bonferroni")
+# pairwise.t.test(outcome, group, p.adjust.method = "holm")
+TukeyHSD(in.mod, conf.level = 0.95)
+```
+Note the 3 comparisons happening and the respective differences! The 'lwr' and 'upr' are the confidence intervals for each mean
+difference and since we are interested in differences, we do not want the confidence interval to contain the null value 0. The 
+'p adj' is our the p-value adjusted for multiple comparisons. Turns out the significant difference is only between Small - Large districts (p-value = 0.022, and the CI does not contain 0).
+
+Note that we call a 95% Family-Wise confidence level, which means we have a 5% family-wise error rate. The FWER is the probability of 
+at least one type I error in a set of tests. This topic can get pretty hairy and is too much for this guide. Specially since
+Tukey, Bonferroni, etc., all have their own method to control the error rate. Anyway, here is a plot of our districts.
+
+```{r hyp7_3, echo=FALSE, echo=FALSE, fig.height=4, fig.width=8, fig.align='center'}
+### within group 
+# il_plt <- summarySEwithin(il2018, measurevar="math_score", withinvars="dstsize",
+#                        idvar="sedaadmin", na.rm=FALSE, conf.interval=.95)
+### between group
+in_plt <- summarySE(in2018, measurevar="math_score", groupvars = "dstsize",
+                         na.rm=FALSE, conf.interval=.95)
+
+ggplot(in_plt, aes(x=dstsize, y=math_score, group = 1)) +
+    geom_line() +
+    geom_errorbar(width=.2, aes(ymin=math_score-ci, ymax=math_score+ci), colour="black") +
+    geom_point(shape=23, size=3, fill="orange") 
+
+```
+
+## One Sample, Dichotomous Outcome
+
+The objective here is to compare the proportion of successes in a sample to a known (or hypothesized) proportion. You need to meet
+the sample size criteria for this to be an appropriate test, which would be the smaller of [n*p0, n(1-p0)] $\geq$ 5. For the next series of
+tests, when we fail to meet appropriate test criteria we can use *exact methods*, such as Fisher's test.
+
+H0: $p$ = $p0$
+
+H1: $p < p0$ / $p > p0$ / $p$ ne $p0$
+
+You are interested in knowing if there is a significant difference in the proportion of economically disadvantaged school districts as 
+compared to a claimed national estimate that only 25% of school districts are economically disadvantaged. Keep in mind that we previously
+dichotomized free lunch as >.50 and <.50, where school districts with >.50 are considered economically disadvantaged. 
+```{r hyp8}
+### first, you can use table function to get the frequencies for both levels 
+### of your dichotomous variable
+table(scores2018$frlunch)
+
+### second, use prop.test(frequency for level of interest, total sample size, 
+### p = known/hypothesized proportion, alternative = " ")
+prop.test(2802, 6085, p = 0.25, alternative = "two.sided")
+```
+From the output above, we see that R uses x-squared statistic. But we want to use the z statistic. So the calculation is:
+
+z = $\hat{p}$ - $p_0$ / $\sqrt(p_0(1 - p_0)/n$}
+```{r hyp8_2}
+z <- (0.4604 - 0.25)/sqrt((0.25*(1-0.25))/6085)
+z
+```
+This is a two-tailed test with alpha = 0.5, so we reject the H0 if z $\leq$ -1.96 or if z $\geq$ 1.96. Since 37.90 $\geq$ 1.96, we can
+reject the H0 in favor of the H1. We have evidence at alpha = 0.05 to show that there is a statistically significant difference
+in the proportion of economically disadvantaged school districts as compared to the claimed national proportion.
+
+## One Sample, Categorical or Ordinal Outcome
+
+The objective with this test is to compare the proportions of each response category to a known (or hypothesized) distribution. Previously,
+we had a dichotomous outcome (two levels), now we expand to more than two levels using the $X^{2}$ *Goodness-of-Fit* test. The 
+observed frequencies are compared to the expected frequencies, where the observed frequencies are what we have and expected frequencies 
+are the product of total sample size times the known (or hypothesized) proportions. There is only a one-tail version of this test where if
+the observed and expected frequencies are close in value then $X^{2}$ will be near 0. Conversely, if the $X^{2}$ is larger, the rejection region 
+will be to the right. This test is indexed on degrees of freedom (k-1) and the chosen alpha level. We will use district size since it has 3 
+levels(small, medium, and large). Must meet assumption that the frequency of each level of the outcome variable is $\geq$ 5. 
+
+H0: $p_1$ = $p$ of comparator 1, $p_2$ = p of comp. 2, $p_3$ = p of comp. 3, ...
+
+H1: H0 is false
+
+Again, some claimed national estimate reported that the proportion of district sizes were 20% for large, 25% medium and 55% for small. 
+You decide to test this claim. 
+```{r hyp9}
+### first get frequencies for all levels of categorical variable
+table(scores2018$dstsize)
+
+### note the order and enter frequencies.
+### p=c() is the known (or hypothesized) proportions, enter in same order as frequencies
+chisq.test(c(1520, 1983, 2582), p = c(.20, .25, .55))
+
+```
+This is a $X^{2}$ *Goodness-of-Fit* with alpha = 0.5 and Df=(3-1), so we reject the H0 if $X^{2}$ $\geq$ 5.99 (image below). 
+Since 390.34 > 5.99, we can reject the H0 in favor of the H1. We have evidence at alpha = 0.05 to show that there is a statistically 
+significant difference in the distribution of district size proportions compared to the claimed proportions of 20%, 25% and 55%.
+```{r hyp9_png, include=FALSE}
+img <- readPNG("~/R Scripts/chidist.png")
+```
+
+```{r hyp9_png2, echo=FALSE, fig.height=4, fig.width=6, fig.align='center'}
+grid.raster(img)
+```
+
+
+## Two Independent Samples, Dichotomous Outcome
+
+The objective here is to test if the proportion of success in one group is different form the proportion of success in another group. Success
+is the response of interest in the outcome variable. Need to meet assumption that we have at least 5 successes (n*p) and 5 failures [n(1-p)] 
+in each group. We will also need the overall proportion of success to calculate z.
+
+H0: $p_1$ = $p_2$
+
+H1: $p_1$ ne $p_2$
+
+We will use our dichotomous economically disadvantaged (frlunch) as the outcome variable and our group variable will be the dichotomous ELL 
+variable. We will test if the proportion of ELLs in economically disadvantaged school districts differ significantly among districts with ELLs
+in non-economically disadvantaged school districts.
+```{r hyp10}
+xtabs(~scores2018$ell + scores2018$frlunch)
+prop.test(x=c(874, 1928), n=c(1101, 4984), alternative = "two.sided")
+```
+Again, R outputs the $X^{2}$ statistic, so we will do it with z where:
+
+$\hat{p}$ = ($x_1$ + $x_2$) / ($n_1$ + $n_2$)
+
+$z$ =  $\hat{p_1}$ - $\hat{p_2}$ / $\sqrt($ $\hat{p}$(1 - $\hat{p}$)(1/$n_1$ + 1/$n_2$)
+
+```{r hyp10_1}
+# get proportion of group 1
+p1 <- 874/1101
+p1
+# get proportion of group 2
+p2 <- 1928/4984
+p2
+# get overall proportion
+phat <- (874 + 1928)/(1101 + 4984)
+phat
+# calculate z
+z <-  (0.7938 - 0.3868) / sqrt(0.4604*(1 - 0.4604)*((1/1101) + (1/4984)))
+z
+```
+This is a two-tailed test with alpha = 0.5, so we reject the H0 if z $\leq$ -1.96 or if z $\geq$ 1.96. Since 24.5 $\geq$ 1.96, we can
+reject the H0 in favor of the H1. We have evidence at alpha = 0.05 to show that there is a statistically significant difference
+in the proportion ELLs in economically disadvantaged school districts compared to ELLs in non-economically disadvantaged school districts.
+
+## Two or More Independent Samples, Categorical or Ordinal Outcome
+
+$X^{2}$ *Test of Independence* is used when the objective of the analysis is to compare the response distribution of the outcome among 
+several independent comparison groups. The H0 is the distribution of the outcome is independent of the groups, whereas the H1 is that 
+the distribution of the outcome depends on the group. Independence can be defined as when two events A and B are independent if 
+P(A given B) = P(A) or P(B|A) = P(B). More simply put, P(group 1 and response 1) = P(group 1)P(response 1). Therefore, both events are
+independent if the probability of one is not affected by the occurrence or non-occurrence of the other. We also need expected cell frequencies
+is at least 5. Degrees of freedom for this test is Df = (r - 1)*(c - 1), where r is the number of groups, and c is the number of outcome levels.
+
+H0: The outcome variable and group variable are independent
+
+H1: The H0 is false
+
+If we wanted to know if there is a relationship between large ELL populations in school districts and border states, we will have to do some
+data manipulation.
+```{r hyp11}
+scores_x2 <- scores2018 %>% 
+  mutate(border_st = ifelse(stateabb %in% c("CA", "AZ", "NM", "TX"), 1, 2))
+
+### make a rXc table for use in test. Also make cell proportions for review
+x2tab <- with(scores_x2, table(scores_x2$border_st, scores_x2$ell))
+prop.table(x2tab, margin = 1)
+
+### run test 
+x2test <- chisq.test(x2tab)
+x2test
+
+### check observed frequencies
+x2test$observed
+
+### check expected frequencies
+x2test$expected
+```
+This is a $X^{2}$ *Test of Independence* so there is only one tail to the right. The critical value is indexed by Df=(r-1)(c-1) which 
+equals to (2-1)(2-1)= 1. At alpha = 0.05 and Df=1, our $X^{2}$ statistic needs to be $\geq$ 3.84. Since 1278.9 > 3.84, we have
+statistically significant evidence at alpha = 0.05 to reject the H0 in favor of the H1. Larger populations of ELLs **depends** on whether 
+a state is a southern border state or not. Note the row-wise proportions in the first table. We have 58% of southern border states with
+large populations of ELLs as compared to the 10% of non-border states with large populations of ELLs. Also note the expected frequencies
+for southern border states with large ELL populations. Under the H0, that outcome and group are independent, we would expect to have 
+179.1 compared to our observed frequency of 576.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
