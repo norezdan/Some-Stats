@@ -4,6 +4,5 @@ This repo currently has a RMarkdown file containing summary statistics and param
 If you found this by chance ;), note that I am using an education data set to make the concepts more concrete for my friend.
 
 ## Update
-I just noticed that you have to download the html file in order to view it. Or you can add **https://html-preview.github.io/?url=** to https://github.com/norezdan/Some-Stats/blob/main/ed_summ.html.
-i.e. https://html-preview.github.io/?url=https://github.com/norezdan/Some-Stats/blob/main/ed_summ.html
+I just noticed that you have to download the html file in order to view it. Or you can view it here https://html-preview.github.io/?url=https://github.com/norezdan/Some-Stats/blob/main/ed_summ.html
 
